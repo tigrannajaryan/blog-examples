@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package otlp;
+
+// A list of metrics from a Resource.
+message ResourceMetrics {
+  Resource resource = 1;
+  repeated Metric metrics = 2;
+}
+
+// A list of prepared metrics from a Resource.
+message ResourceMetricsPrepared {
+  bytes resource = 1;
+  repeated MetricPrepared metrics = 2;
+}
+
+// Resource information. This describes the source of telemetry data.
+message Resource {
+  repeated AttributeKeyValue labels = 1;
+  int32 dropped_labels_count = 2;
+}
+
+// AttributeKeyValue is a key-value pair that is used to store Span attributes, Resource
+// labels, etc.
+message AttributeKeyValue {
+  // ValueType is the enumeration of possible types that value can have.
+  enum ValueType {
+    STRING  = 0;
+    BOOL    = 1;
+    INT64   = 2;
+    DOUBLE  = 3;
+  };
+
+  // key part of the key-value pair.
+  string key = 1;
+
+  // type of the value.
+  ValueType type = 2;
+
+  // Only one of the following fields is supposed to contain data (determined by `type` field value).
+  // This is deliberately not using Protobuf `oneof` for performance reasons (verified by benchmarks).
+
+  string string_value = 3;
+  int64 int64_value = 4;
+  bool bool_value = 5;
+  double double_value = 6;
+}
+
+// Defines a Metric which has one or more timeseries.
+message Metric {
+  MetricDescriptor metric_descriptor = 1;
+  Resource resource = 2;
+  repeated Int64TimeSeries int64_timeseries = 3;
+}
+
+// MetricPrepared is the prepared version of Metric.
+//
+// MetricPrepared is byte-level compatible with Metric. A byte-array encoding of
+// MetricPrepared can be decoded as Metric and vice-versa. This allows senders that
+// need to continuously create and encode instances of Metric with unchanging
+// MetricDescriptor and Resource values to prepare and encode metric_descriptor and
+// resource fields once and then create instances MetricPrepared messages where only
+// timeseries data changes.
+message MetricPrepared {
+  // metric_descriptor is byte array representation of MetricDescriptor encoded
+  // in ProtoBuf format using proto.Marshal().
+  bytes metric_descriptor = 1;
+
+  // resource is byte array representation of Resource encoded
+  // in ProtoBuf format using proto.Marshal().
+  bytes resource = 2;
+
+  repeated Int64TimeSeriesPrepared int64_timeseries = 3;
+}
+
+// Defines a metric type and its schema.
+message MetricDescriptor {
+  string name = 1;
+  string description = 2;
+  string unit = 3;
+
+  enum Type {
+    UNSPECIFIED = 0;
+    GAUGE_INT64 = 1;
+    GAUGE_DOUBLE = 2;
+    GAUGE_HISTOGRAM = 3;
+    COUNTER_INT64 = 4;
+    COUNTER_DOUBLE = 5;
+    CUMULATIVE_HISTOGRAM = 6;
+    SUMMARY = 7;
+  }
+  Type type = 4;
+
+  repeated string label_keys = 5;
+}
+
+// Int64TimeSeries is a list of data points that describes the time-varying values
+// of a int64 metric.
+message Int64TimeSeries {
+  LabelValues label_values = 1;
+  repeated Int64Value points = 2;
+}
+
+// Int64TimeSeriesPrepared is the prepared version of Int64TimeSeries.
+message Int64TimeSeriesPrepared {
+  bytes label_values = 1;
+  repeated Int64Value points = 2;
+}
+
+// LabelValues is a list of label string values.
+message LabelValues {
+  repeated string values = 1;
+  repeated int32 unspecified_value_indexes = 2;
+}
+
+// Int64Value is a timestamped measurement of int64 value.
+message Int64Value {
+  sfixed64 start_time_unixnano = 1;
+  sfixed64 timestamp_unixnano = 2;
+  sfixed64 value = 3;
+}
